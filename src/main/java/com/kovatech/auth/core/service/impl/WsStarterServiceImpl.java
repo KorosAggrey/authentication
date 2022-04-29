@@ -16,8 +16,7 @@ import java.util.stream.IntStream;
 
 
 @Repository
-public class WsStarterServiceImpl
-        implements WsStarterService {
+public class WsStarterServiceImpl implements WsStarterService {
     private final WsStarterProperties starterProperties;
     private final ObjectMapper objectMapper;
 
@@ -26,6 +25,12 @@ public class WsStarterServiceImpl
         this.objectMapper = new ObjectMapper();
     }
 
+
+    String upperAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    String lowerAlphabet = "abcdefghijklmnopqrstuvwxyz";
+    String numbers = "0123456789";
+    // combine all strings
+    String alphaNumeric = upperAlphabet + lowerAlphabet + numbers;
 
     public String formatAndCompareMsisdn(String headerMsisdn, String bodyMsisdn, boolean validate, boolean hash) {
         headerMsisdn = this.starterProperties.getMsisdnPrefix() + getMsisdn(headerMsisdn);
@@ -88,6 +93,20 @@ public class WsStarterServiceImpl
         } catch (JsonProcessingException ex) {
             return "";
         }
+    }
+
+    @Override
+    public String getRandomAlphanumeticText(Integer paramInteger) {
+        StringBuilder sb = new StringBuilder();
+        Random random = new Random();
+        int length = paramInteger > 0 ? paramInteger: 10;
+        for(int i = 0; i < length; i++) {
+            int index = random.nextInt(alphaNumeric.length());
+            char randomChar = alphaNumeric.charAt(index);
+            sb.append(randomChar);
+        }
+        String randomString = sb.toString();
+        return randomString.toLowerCase(Locale.ROOT);
     }
 
 

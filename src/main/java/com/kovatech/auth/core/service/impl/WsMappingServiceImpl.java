@@ -1,5 +1,7 @@
 package com.kovatech.auth.core.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kovatech.auth.core.config.WsMapperProperties;
 import com.kovatech.auth.core.config.WsStarterConfig;
 import com.kovatech.auth.core.enums.WsProcessLogger;

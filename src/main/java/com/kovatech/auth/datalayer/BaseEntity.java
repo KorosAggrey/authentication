@@ -1,7 +1,9 @@
 package com.kovatech.auth.datalayer;
 
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Getter
@@ -10,8 +12,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class BaseEntity {
 
-    private LocalDateTime createdOn;
-    private LocalDateTime modifiedOn;
+    private String createdOn;
+    private String modifiedOn;
     private int createdBy;
     private int modifiedBy;
 }

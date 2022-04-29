@@ -5,10 +5,9 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
@@ -17,10 +16,12 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Table("users")
-public class User extends BaseEntity implements Persistable<String> {
+public class User extends BaseEntity implements Persistable<Integer> {
 
     @Id
     private int id;
+    @Column("public_id")
+    private String publicId;
     private String username;
     private String password;
     private String phone;
@@ -29,20 +30,21 @@ public class User extends BaseEntity implements Persistable<String> {
     private String middleName;
     private String lastName;
     private String idNumber;
-    private boolean isActive;
-
+    private int isActive;
+    private int active;
+    private String activationCode;
 
     @Transient
     private boolean newUser;
 
     @Override
-    public String getId() {
-        return UUID.randomUUID().toString();
+    public Integer getId() {
+        return id;
     }
 
     @Override
     public boolean isNew() {
-        return this.newUser || id == 0;
+        return this.newUser;
     }
 
     public User setAsNew(){

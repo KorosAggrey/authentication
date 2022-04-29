@@ -8,12 +8,15 @@ import com.kovatech.auth.core.model.WsEncryptedPayload;
 import com.kovatech.auth.core.model.WsError;
 import com.kovatech.auth.core.model.WsHeader;
 import com.kovatech.auth.core.model.WsResponse;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebExchangeDecorator;
 import org.springframework.web.server.WebFilter;
@@ -41,6 +44,10 @@ public class WsWrapperUtility
         this.debugMode = "production".equals(starterProperties.getProfile()) ? false : wrapperProperties.isDebugModeEnabled();
     }
 
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         if (!exchange.getRequest().getURI().getPath().contains("swagger") &&

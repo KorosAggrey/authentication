@@ -18,6 +18,8 @@ public interface WsStarterService {
   
   String serialize(Object paramObject);
   
+  String getRandomAlphanumeticText(Integer paramInteger);
+
   String getRandomText(Integer paramInteger, String paramString);
   
   String generateRandomText(String[] paramArrayOfString, int paramInt, String paramString);

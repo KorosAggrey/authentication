@@ -15,11 +15,9 @@ import java.util.Map;
 public class WsMapperRepository {
     private final WsMapperProperties mapperProperties;
     private final ObjectMapper objectMapper;
-   // private final ReactiveHashOperations hashOperations;
 
-    public WsMapperRepository(/*ReactiveRedisTemplate reactiveRedisTemplate,*/ WsMapperProperties mapperProperties) {
+    public WsMapperRepository(WsMapperProperties mapperProperties) {
         this.objectMapper = new ObjectMapper();
-       // this.hashOperations = reactiveRedisTemplate.opsForHash();
         this.mapperProperties = mapperProperties;
     }
 
@@ -30,16 +28,25 @@ public class WsMapperRepository {
 
     public Map<String, WsResponseDetails> getDxlStarterResponses() {
         Map<String,String> res = responses();
+        Map<String,String> techRes = technicalResponses();
         Map<String,WsResponseDetails> newRes = new HashMap<>();
         for(String key: res.keySet()){
             WsResponseDetails var1 = new WsResponseDetails();
+            String var2 = res.get(key);
+            if(techRes.containsKey(key)){
+                var2 = techRes.get(key);
+            }
             var1.setCustomerMessage(res.get(key));
             var1.setErrorCode(key);
-            var1.setResponseCode(400);
+            int code = 400;
+            if(isNumeric(key)) {
+                 code = Integer.parseInt(key);
+            }
+            var1.setResponseCode(code);
             var1.setErrorType("Custom");
             var1.setServiceName("Starter");
             var1.setErrorSource("Starter Utility");
-            var1.setTechnicalMessage(res.get(key));
+            var1.setTechnicalMessage(var2);
             res.get(key);
             newRes.put(key,var1);
         }
@@ -48,25 +55,57 @@ public class WsMapperRepository {
 
     public Map<String,String> responses(){
         Map<String,String> res = new HashMap<>();
+        res.put("CRW100053","Request failed. Please try again later");
+        res.put("408","Request failed, please try again later\"");
+        res.put("CRW100050","Missing/Invalid headers");
+        res.put("404","No records found");
+        res.put("CRW100056","No handler");
+        res.put("200","Request executed successfully");
+        res.put("400","Request failed, please try again later");
+        res.put("CRW100058","Sorry, the resource is being used by another entity");
+        res.put("CRW100061","Sorry, request could not be processed. Failed validation");
+        res.put("CRW100051","Sorry, requested resource could not be found");
+        res.put("422","Service is temporarily unavailable");
+        res.put("CRW100052","Request failed. Please try again later");
+        res.put("CRE100054","Request failed, please try again later");
+        res.put("203","User exist, proceed to verify your email address");
+        res.put("204","Otp code invalid");
+        res.put("205","Success");
+        return res;
+    }
+
+    public Map<String,String> technicalResponses(){
+        Map<String,String> res = new HashMap<>();
         res.put("CRW100053","Invalid payload");
         res.put("408","Connection Timeout");
         res.put("CRW100050","Missing/Invalid headers");
-        res.put("404","No records found");
+        res.put("404","Not found");
         res.put("CRW100056","Sorry, requested resource path could not be found");
-        res.put("200","Request submitted successful");
+        res.put("200","Success");
         res.put("400","Bad Request");
-        res.put("CRW100058","Sorry, the resource is being used by another entity");
+        res.put("CRW100058","Bad Request");
         res.put("CRW100061","Validation Failed");
-        res.put("CRW100051","Sorry, requested resource could not be found");
-        res.put("422","Service is temporarily unavailable");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
-        res.put("CRW100053","Invalid payload");
+        res.put("CRW100051","Not found");
+        res.put("CRW100052","Invalid payload");
+        res.put("422","Bad Gateway");
+        res.put("CRE100054","Internal Server Error");
+        res.put("203","User exist, account not verified");
+        res.put("204","Otp code not found");
+        res.put("205","Success");
         return res;
+    }
+
+    public static boolean isNumeric(String string) {
+        int intValue;
+        if(string == null || string.equals("")) {
+            return false;
+        }
+        try {
+            intValue = Integer.parseInt(string);
+            return true;
+        } catch (NumberFormatException e) {
+        }
+        return false;
     }
 
     private WsResponseDetails deserialize(Object object) {
