@@ -71,6 +71,7 @@ public class WsMapperRepository {
         res.put("203","User exist, proceed to verify your email address");
         res.put("204","Otp code invalid");
         res.put("205","Success");
+        res.put("402","Password is not correct");
         return res;
     }
 
@@ -92,6 +93,7 @@ public class WsMapperRepository {
         res.put("203","User exist, account not verified");
         res.put("204","Otp code not found");
         res.put("205","Success");
+        res.put("402","Password is not correct");
         return res;
     }
 

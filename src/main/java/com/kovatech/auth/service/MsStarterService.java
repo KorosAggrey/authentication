@@ -1,6 +1,7 @@
 package com.kovatech.auth.service;
 
 import com.kovatech.auth.core.model.WsResponse;
+import com.kovatech.auth.models.Login;
 import com.kovatech.auth.models.OtpResend;
 import com.kovatech.auth.models.OtpVerification;
 import com.kovatech.auth.models.SignUp;
@@ -19,4 +20,6 @@ public interface MsStarterService {
     Mono<WsResponse> otpVerification(Map<String, String> headers, Mono<OtpVerification> otp);
 
     Mono<WsResponse> resendOtp(Map<String, String> headers, Mono<OtpResend> payload);
+
+    Mono<WsResponse> login(Map<String, String> headers, Mono<Login> payload);
 }

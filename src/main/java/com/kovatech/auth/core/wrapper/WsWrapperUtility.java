@@ -41,7 +41,8 @@ public class WsWrapperUtility
         this.wrapperService = wrapperService;
         this.processes = starterConfig.process();
         this.credentials = starterConfig.credentials();
-        this.debugMode = "production".equals(starterProperties.getProfile()) ? false : wrapperProperties.isDebugModeEnabled();
+        this.debugMode = true;
+        //this.debugMode = "production".equals(starterProperties.getProfile()) ? false : wrapperProperties.isDebugModeEnabled();
     }
 
     @Bean

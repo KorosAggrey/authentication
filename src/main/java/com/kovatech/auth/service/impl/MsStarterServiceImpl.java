@@ -1,22 +1,29 @@
 package com.kovatech.auth.service.impl;
 
+import com.kovatech.auth.component.JwtUtilsComponent;
 import com.kovatech.auth.component.MessagingService;
 import com.kovatech.auth.config.GroupsConfig;
+import com.kovatech.auth.core.annotation.WsProcess;
 import com.kovatech.auth.core.model.WsResponse;
 import com.kovatech.auth.core.model.WsResponseDetails;
+import com.kovatech.auth.core.security.AesCbcEncryptorDecryptor;
+import com.kovatech.auth.core.security.WsEncoder;
 import com.kovatech.auth.core.service.WsMappingService;
 import com.kovatech.auth.core.service.WsResponseMapper;
 import com.kovatech.auth.core.service.WsStarterService;
 import com.kovatech.auth.datalayer.entities.User;
 import com.kovatech.auth.datalayer.entities.UserGroups;
+import com.kovatech.auth.models.Login;
 import com.kovatech.auth.models.OtpResend;
 import com.kovatech.auth.models.OtpVerification;
 import com.kovatech.auth.models.SignUp;
+import com.kovatech.auth.models.dto.JwtDto;
 import com.kovatech.auth.repositories.UserGroupsRepository;
 import com.kovatech.auth.repositories.UserRepository;
 import com.kovatech.auth.service.MsStarterService;
 import com.kovatech.auth.utils.Validations;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -25,8 +32,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static com.kovatech.auth.core.utils.WsStarterVariables.*;
-import static com.kovatech.auth.utils.MsStarterVariables.ERR_SUCCESS;
-import static com.kovatech.auth.utils.MsStarterVariables.TRANS_GET_RESPONSES;
+import static com.kovatech.auth.utils.MsStarterVariables.*;
 
 
 /**
@@ -52,18 +58,23 @@ public class MsStarterServiceImpl implements MsStarterService {
     @Autowired
     Validations validation;
 
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    JwtUtilsComponent jwtUtils;
 
     private final GroupsConfig groupsConfig;
     private final WsMappingService mappingService;
 
-    public MsStarterServiceImpl(WsResponseMapper responseMapper, PasswordEncoder passwordEncoder, GroupsConfig groupsConfig, WsMappingService mappingService){
+    @Autowired
+    private WsEncoder encryptor;
+
+    PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    public MsStarterServiceImpl(WsResponseMapper responseMapper, GroupsConfig groupsConfig, WsMappingService mappingService){
         this.responseMapper = responseMapper;
-        this.passwordEncoder = passwordEncoder;
         this.groupsConfig = groupsConfig;
         this.mappingService = mappingService;
     }
 
+    @WsProcess(TRANS_GET_RESPONSES)
     public Mono<WsResponse> signUpUser(Map<String, String> headers, Mono<SignUp> userDtoMono){
         return userDtoMono.flatMap(res -> {
             String msisdn = starterService.formatAndCompareMsisdn(res.getPhone(),res.getPhone(),false,false);
@@ -143,10 +154,84 @@ public class MsStarterServiceImpl implements MsStarterService {
                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
                            ES, FALSE, headers);
                }
-               System.out.println(starterService.serialize(res));
-               return responseMapper.setApiResponse(ERR_SUCCESS, NULL, TRANS_GET_RESPONSES, ES, ES, ES, FALSE, headers);
+               Mono<User> resendOtp = resenOtpProcess(res);
+               return resendOtp.flatMap( updatedData ->{
+                   messagingService.prepareVerificationMessage(updatedData);
+                   WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
+                           headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                   responseDetails.setCustomerMessage("Otp sent successfully, proceed to verify your account");
+                   return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
+                           ES, FALSE, headers);
+               });
+
            });
         });
+    }
+
+    @Override
+    @WsProcess(TRANS_GET_LOGIN_RESPONSES)
+    public Mono<WsResponse> login(Map<String, String> headers, Mono<Login> payload) {
+        return payload.flatMap( req -> {
+            Mono<User> user = Mono.just(new User());
+            if(validation.isValidEmail(req.getIdentity())){
+                user = userRepository.findByEmail(req.getIdentity());
+            }else{
+                String msisdn = starterService.formatAndCompareMsisdn(req.getIdentity(),req.getIdentity(),false,false);
+                user = userRepository.findByMsisdn(msisdn);
+            }
+            return user.defaultIfEmpty(new User()).flatMap(res -> {
+                if(res.getPhone() == null){
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper("404",
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                    responseDetails.setCustomerMessage("User details not found");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+                }
+                Mono<User> resendOtp = resenOtpProcess(res);
+                return resendOtp.flatMap( updatedData ->{
+                    if (encryptor.loginDecrypt(res.getPassword()).equalsIgnoreCase(req.getPassword())) {
+                        System.out.println("Matched!");
+                        String jwt = jwtUtils.generateToken(updatedData);
+                        JwtDto response = JwtDto.builder()
+                                .id(updatedData.getPublicId())
+                                .email(updatedData.getEmail())
+                                .token(jwt)
+                                .name(updatedData.getFirstName())
+                                .email(updatedData.getEmail())
+                                .type("Bearer")
+                                .roles(new ArrayList(Arrays.asList("User")))
+                                .build();
+                        WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
+                                headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                        responseDetails.setCustomerMessage("Successfully logged in");
+                        return responseMapper.setApiResponse(responseDetails, response, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                                ES, FALSE, headers);
+                    }
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper("402",
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                    responseDetails.setCustomerMessage("Password incorrect");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+                });
+
+            });
+        });
+    }
+
+    private Mono<User> resenOtpProcess(User res) {
+        Random rand = new Random(); //instance of random class
+        int upperbound = 1000000;
+        //generate random values from 0-24
+        int intRandom = rand.nextInt(upperbound);
+        res.setActive(0);
+        res.setIsActive(0);
+        res.setActivationCode(String.valueOf(intRandom));
+        res.setModifiedBy(res.getId());
+        res.setModifiedOn(LocalDateTime.now().toString());
+        res.setExpiryTime(LocalDateTime.now().plusHours(24).toString());
+        res.setAsUpdate();
+        userRepository.save(res).subscribe();
+        return Mono.just(res);
     }
 
     private Mono<User> getUserByEmail(SignUp res, Map<String, String> headers) {
@@ -169,6 +254,7 @@ public class MsStarterServiceImpl implements MsStarterService {
         var1.setPassword(passwordEncoder.encode(res.getPassword()));
         var1.setPhone(res.getPhone());
         var1.setCreatedOn(LocalDateTime.now().toString());
+        var1.setExpiryTime(LocalDateTime.now().plusHours(24).toString());
         var1.setModifiedOn(LocalDateTime.now().toString());
         var1.setPublicId(UUID.randomUUID().toString());
         Random rand = new Random(); //instance of random class

@@ -1,5 +1,6 @@
 package com.kovatech.auth.core.security;
 
+import com.kovatech.auth.core.config.WsBasicAuthProperties;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -15,6 +16,11 @@ public class AesCbcEncryptorDecryptor {
 
     private static SecretKeySpec secretKey;
     private static byte[] key;
+    private final WsBasicAuthProperties authProperties;
+
+    public AesCbcEncryptorDecryptor(WsBasicAuthProperties authProperties) {
+        this.authProperties = authProperties;
+    }
 
     public static void setKey(final String myKey) {
         MessageDigest sha = null;
@@ -53,5 +59,15 @@ public class AesCbcEncryptorDecryptor {
             System.out.println("Error while decrypting: " + e.toString());
         }
         return null;
+    }
+
+    public String loginDecrypt(String rawPassword){
+        String saltKey = authProperties.getStaticIv();
+        return decrypt(rawPassword,saltKey);
+    }
+
+    public String signUpEncrypt(String rawPassword){
+        String saltKey = authProperties.getStaticIv();
+        return encrypt(rawPassword,saltKey);
     }
 }

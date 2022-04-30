@@ -2,6 +2,7 @@ package com.kovatech.auth.controller;
 
 import com.kovatech.auth.AuthApplication;
 import com.kovatech.auth.core.model.WsResponse;
+import com.kovatech.auth.models.Login;
 import com.kovatech.auth.models.OtpResend;
 import com.kovatech.auth.models.OtpVerification;
 import com.kovatech.auth.models.SignUp;
@@ -41,5 +42,11 @@ public class MsStarterController {
     public Mono<WsResponse> resendOtp(@RequestHeader Map<String,String> headers,
                                       @Valid @RequestBody Mono<OtpResend> payload){
         return starterService.resendOtp(headers,payload);
+    }
+
+    @PostMapping("/login")
+    public Mono<WsResponse> login(@RequestHeader Map<String,String> headers,
+                                  @Valid @RequestBody Mono<Login> payload){
+        return starterService.login(headers,payload);
     }
 }
