@@ -2,10 +2,7 @@ package com.kovatech.auth.controller;
 
 import com.kovatech.auth.AuthApplication;
 import com.kovatech.auth.core.model.WsResponse;
-import com.kovatech.auth.models.Login;
-import com.kovatech.auth.models.OtpResend;
-import com.kovatech.auth.models.OtpVerification;
-import com.kovatech.auth.models.SignUp;
+import com.kovatech.auth.models.*;
 import com.kovatech.auth.service.MsStarterService;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -48,5 +45,23 @@ public class MsStarterController {
     public Mono<WsResponse> login(@RequestHeader Map<String,String> headers,
                                   @Valid @RequestBody Mono<Login> payload){
         return starterService.login(headers,payload);
+    }
+
+    @PostMapping("/forgotPassword")
+    public Mono<WsResponse> forgotPassword(@RequestHeader Map<String,String> headers,
+                                           @Valid @RequestBody Mono<OtpResend> payload){
+        return starterService.forgotPassword(headers,payload);
+    }
+
+    @PostMapping("/confirmCode")
+    public Mono<WsResponse> confirmCode(@RequestHeader Map<String,String> headers,
+                                        @Valid @RequestBody Mono<OtpVerification> payload){
+        return starterService.confirmCode(headers,payload);
+    }
+
+    @PostMapping("/setPassword")
+    public Mono<WsResponse> setNewPassword(@RequestHeader Map<String,String> headers,
+                                        @Valid @RequestBody Mono<ResetPassword> payload){
+        return starterService.setNewPassword(headers,payload);
     }
 }

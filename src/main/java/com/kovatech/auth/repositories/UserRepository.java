@@ -16,4 +16,6 @@ public interface UserRepository extends ReactiveCrudRepository<User, Integer> {
     Mono<User> findByEmail(String email);
     @Query("SELECT * FROM users WHERE activation_code =:code LIMIT 1")
     Mono<User> getByVerificationCode(String code);
+    @Query("SELECT * FROM users WHERE forgotten_password_code =:code LIMIT 1")
+    Mono<User> getByForgotPasswordCode(String code);
 }

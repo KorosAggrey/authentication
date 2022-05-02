@@ -1,10 +1,7 @@
 package com.kovatech.auth.service;
 
 import com.kovatech.auth.core.model.WsResponse;
-import com.kovatech.auth.models.Login;
-import com.kovatech.auth.models.OtpResend;
-import com.kovatech.auth.models.OtpVerification;
-import com.kovatech.auth.models.SignUp;
+import com.kovatech.auth.models.*;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -22,4 +19,10 @@ public interface MsStarterService {
     Mono<WsResponse> resendOtp(Map<String, String> headers, Mono<OtpResend> payload);
 
     Mono<WsResponse> login(Map<String, String> headers, Mono<Login> payload);
+
+    Mono<WsResponse> forgotPassword(Map<String, String> headers, Mono<OtpResend> payload);
+
+    Mono<WsResponse> confirmCode(Map<String, String> headers, Mono<OtpVerification> payload);
+
+    Mono<WsResponse> setNewPassword(Map<String, String> headers, Mono<ResetPassword> payload);
 }

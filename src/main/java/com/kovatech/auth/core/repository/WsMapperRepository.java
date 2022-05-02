@@ -72,6 +72,7 @@ public class WsMapperRepository {
         res.put("204","Otp code invalid");
         res.put("205","Success");
         res.put("402","Password is not correct");
+        res.put("403","Validation Error");
         return res;
     }
 
@@ -94,6 +95,7 @@ public class WsMapperRepository {
         res.put("204","Otp code not found");
         res.put("205","Success");
         res.put("402","Password is not correct");
+        res.put("403","Password and confirm password do not match");
         return res;
     }
 

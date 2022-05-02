@@ -9,7 +9,6 @@ import com.socketLabs.injectionApi.message.BasicMessage;
 import com.socketLabs.injectionApi.message.EmailAddress;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
-import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,8 +61,9 @@ public class MessagingService {
 
     public void prepareVerificationMessage(User createdUser){
         String emailContent = null;
+        String name = "signUp.ftlh";
         try {
-            emailContent = getEmailContent(createdUser);
+            emailContent = getEmailContent(createdUser,name);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (TemplateException e) {
@@ -71,6 +71,23 @@ public class MessagingService {
         }
         EmailProperties properties = EmailProperties.builder()
                 .emailTO(createdUser.getEmail()).Subject("Email Verification OTP for GitBets").htmlContent(emailContent)
+                .plainTextContent(null).build();
+        sendEmailViaSocketLabs(properties);
+    }
+
+    public void prepareForgotPasswordMessage(User updatedData) {
+        String emailContent = null;
+        String name = "forgot.ftlh";
+        updatedData.setActivationCode(updatedData.getForgottenPasswordCode());
+        try {
+            emailContent = getEmailContent(updatedData, name);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (TemplateException e) {
+            e.printStackTrace();
+        }
+        EmailProperties properties = EmailProperties.builder()
+                .emailTO(updatedData.getEmail()).Subject("Reset Password OTP for GitBets").htmlContent(emailContent)
                 .plainTextContent(null).build();
         sendEmailViaSocketLabs(properties);
     }
@@ -90,12 +107,14 @@ public class MessagingService {
         }
     }
 
-    String getEmailContent(User user) throws IOException, TemplateException {
+    String getEmailContent(User user, String name) throws IOException, TemplateException {
         StringWriter stringWriter = new StringWriter();
         Map<String, Object> model = new HashMap<>();
         model.put("NAME", user.getFirstName() +" "+user.getLastName());
         model.put("CODE", user.getActivationCode());
-        configuration.getTemplate("signUp.ftlh").process(model, stringWriter);
+        configuration.getTemplate(name).process(model, stringWriter);
         return stringWriter.getBuffer().toString();
     }
+
+
 }

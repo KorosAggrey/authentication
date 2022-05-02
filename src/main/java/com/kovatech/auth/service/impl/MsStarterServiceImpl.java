@@ -13,11 +13,9 @@ import com.kovatech.auth.core.service.WsResponseMapper;
 import com.kovatech.auth.core.service.WsStarterService;
 import com.kovatech.auth.datalayer.entities.User;
 import com.kovatech.auth.datalayer.entities.UserGroups;
-import com.kovatech.auth.models.Login;
-import com.kovatech.auth.models.OtpResend;
-import com.kovatech.auth.models.OtpVerification;
-import com.kovatech.auth.models.SignUp;
+import com.kovatech.auth.models.*;
 import com.kovatech.auth.models.dto.JwtDto;
+import com.kovatech.auth.models.dto.UserDto;
 import com.kovatech.auth.repositories.UserGroupsRepository;
 import com.kovatech.auth.repositories.UserRepository;
 import com.kovatech.auth.service.MsStarterService;
@@ -187,35 +185,166 @@ public class MsStarterServiceImpl implements MsStarterService {
                     return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
                             ES, FALSE, headers);
                 }
-                Mono<User> resendOtp = resenOtpProcess(res);
-                return resendOtp.flatMap( updatedData ->{
-                    if (encryptor.loginDecrypt(res.getPassword()).equalsIgnoreCase(req.getPassword())) {
-                        System.out.println("Matched!");
-                        String jwt = jwtUtils.generateToken(updatedData);
-                        JwtDto response = JwtDto.builder()
-                                .id(updatedData.getPublicId())
-                                .email(updatedData.getEmail())
-                                .token(jwt)
-                                .name(updatedData.getFirstName())
-                                .email(updatedData.getEmail())
-                                .type("Bearer")
-                                .roles(new ArrayList(Arrays.asList("User")))
-                                .build();
-                        WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
-                                headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
-                        responseDetails.setCustomerMessage("Successfully logged in");
-                        return responseMapper.setApiResponse(responseDetails, response, TRANS_GET_LOGIN_RESPONSES, ES, ES,
-                                ES, FALSE, headers);
-                    }
-                    WsResponseDetails responseDetails = mappingService.getErrorMapper("402",
+                if(res.getActive() != 1){
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper("203",
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                    responseDetails.setCustomerMessage("Kindly verify your account to proceed");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+                }
+                if (encryptor.loginDecrypt(res.getPassword()).equalsIgnoreCase(req.getPassword())) {
+
+                    String jwt = jwtUtils.generateToken(res);
+                    JwtDto response = JwtDto.builder()
+                            .id(res.getPublicId())
+                            .email(res.getEmail())
+                            .token(jwt)
+                            .name(res.getFirstName())
+                            .email(res.getEmail())
+                            .type("Bearer")
+                            .roles(new ArrayList(Arrays.asList("User")))
+                            .build();
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
                             headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
-                    responseDetails.setCustomerMessage("Password incorrect");
-                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                    responseDetails.setCustomerMessage("Successfully logged in");
+                    return responseMapper.setApiResponse(responseDetails, response, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+                }
+                WsResponseDetails responseDetails = mappingService.getErrorMapper("402",
+                        headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                responseDetails.setCustomerMessage("Password incorrect");
+                return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                        ES, FALSE, headers);
+
+            });
+        });
+    }
+
+    @Override
+    public Mono<WsResponse> forgotPassword(Map<String, String> headers, Mono<OtpResend> payload) {
+        return payload.flatMap(req -> {
+            Mono<User> user = Mono.just(new User());
+            if(validation.isValidEmail(req.getIdentity())){
+                user = userRepository.findByEmail(req.getIdentity());
+            }else{
+                String msisdn = starterService.formatAndCompareMsisdn(req.getIdentity(),req.getIdentity(),false,false);
+                user = userRepository.findByMsisdn(msisdn);
+            }
+            return user.defaultIfEmpty(new User()).flatMap(res -> {
+                if(res.getPhone() == null){
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper("404",
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                    responseDetails.setCustomerMessage("User details not found");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+                }
+                Mono<User> forgotProcess = forgotPasswordProcess(res);
+                return forgotProcess.flatMap( updatedData ->{
+                    messagingService.prepareForgotPasswordMessage(updatedData);
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                    responseDetails.setCustomerMessage("Forgot password sent successfully, proceed to reset your password");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
                             ES, FALSE, headers);
                 });
 
             });
         });
+    }
+
+    @Override
+    public Mono<WsResponse> confirmCode(Map<String, String> headers, Mono<OtpVerification> payload) {
+        return payload.flatMap(otp -> {
+            return userRepository.getByForgotPasswordCode(otp.getCode())
+                    .defaultIfEmpty(new User())
+                    .flatMap(userR -> {
+                        if(userR.getPhone() != null) {
+                            userR.setActivationCode("");
+                            userR.setModifiedOn(LocalDateTime.now().toString());
+                            userR.setIsActive(1);
+                            userR.setActive(1);
+                            userR.setModifiedBy(userR.getId());
+                            userR.setForgottenPasswordCode(null);
+                            userR.setForgottenPasswordTime(null);
+                            userR.setAsUpdate();
+                            UserDto response = UserDto.builder()
+                                    .name(userR.getFirstName()).email(userR.getEmail())
+                                    .phone(userR.getPhone()).id(userR.getPublicId()).build();
+                            userRepository.save(userR.setAsUpdate()).subscribe();
+                            WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
+                                    headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                            responseDetails.setCustomerMessage("Proceed to set a new password");
+                            return responseMapper.setApiResponse(responseDetails, response, TRANS_GET_RESPONSES, ES, ES,
+                                    ES, FALSE, headers);
+                        }
+                        WsResponseDetails responseDetails = mappingService.getErrorMapper("204",
+                                headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                        responseDetails.setCustomerMessage("Password verification code not found");
+                        return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
+                                ES, FALSE, headers);
+                    });
+        });
+    }
+
+    @Override
+    public Mono<WsResponse> setNewPassword(Map<String, String> headers, Mono<ResetPassword> payload) {
+        return payload.flatMap( req -> {
+            if (req.getPassword().equalsIgnoreCase(req.getConfirmPassword())) {
+                Mono<User> user = Mono.just(new User());
+                if (validation.isValidEmail(req.getIdentity())) {
+                    user = userRepository.findByEmail(req.getIdentity());
+                } else {
+                    String msisdn = starterService.formatAndCompareMsisdn(req.getIdentity(), req.getIdentity(), false, false);
+                    user = userRepository.findByMsisdn(msisdn);
+                }
+                return user.defaultIfEmpty(new User()).flatMap(res -> {
+                    if (res.getPhone() == null) {
+                        WsResponseDetails responseDetails = mappingService.getErrorMapper("404",
+                                headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                        responseDetails.setCustomerMessage("User details not found");
+                        return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                                ES, FALSE, headers);
+                    }
+                    if (res.getActive() != 1) {
+                        WsResponseDetails responseDetails = mappingService.getErrorMapper("203",
+                                headers.get(X_CONVERSATION_ID), TRANS_GET_RESPONSES);
+                        responseDetails.setCustomerMessage("Kindly verify your account to proceed");
+                        return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_RESPONSES, ES, ES,
+                                ES, FALSE, headers);
+                    }
+                    res.setPassword(encryptor.loginEncrypt(req.getPassword()));
+                    res.setModifiedOn(LocalDateTime.now().toString());
+                    res.setModifiedBy(res.getId());
+                    userRepository.save(res.setAsUpdate()).subscribe();
+                    WsResponseDetails responseDetails = mappingService.getErrorMapper(ERR_SUCCESS,
+                            headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+                    responseDetails.setCustomerMessage("Password changed successfully");
+                    return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                            ES, FALSE, headers);
+
+                });
+            }
+            WsResponseDetails responseDetails = mappingService.getErrorMapper("403",
+                    headers.get(X_CONVERSATION_ID), TRANS_GET_LOGIN_RESPONSES);
+            responseDetails.setCustomerMessage("Password incorrect");
+            return responseMapper.setApiResponse(responseDetails, NULL, TRANS_GET_LOGIN_RESPONSES, ES, ES,
+                    ES, FALSE, headers);
+        });
+    }
+
+    private Mono<User> forgotPasswordProcess(User res) {
+        Random rand = new Random(); //instance of random class
+        int upperbound = 1000000;
+        //generate random values from 0-24
+        int intRandom = rand.nextInt(upperbound);
+        res.setForgottenPasswordCode(String.valueOf(intRandom));
+        res.setForgottenPasswordTime(LocalDateTime.now().plusMinutes(20).toString());
+        res.setModifiedBy(res.getId());
+        res.setModifiedOn(LocalDateTime.now().toString());
+        res.setExpiryTime(LocalDateTime.now().plusHours(24).toString());
+        res.setAsUpdate();
+        userRepository.save(res).subscribe();
+        return Mono.just(res);
     }
 
     private Mono<User> resenOtpProcess(User res) {
@@ -251,7 +380,7 @@ public class MsStarterServiceImpl implements MsStarterService {
         var1.setMiddleName(names.get("middle"));
         var1.setLastName(names.get("last"));
         var1.setEmail(res.getEmail());
-        var1.setPassword(passwordEncoder.encode(res.getPassword()));
+        var1.setPassword(encryptor.loginDecrypt(res.getPassword()));
         var1.setPhone(res.getPhone());
         var1.setCreatedOn(LocalDateTime.now().toString());
         var1.setExpiryTime(LocalDateTime.now().plusHours(24).toString());

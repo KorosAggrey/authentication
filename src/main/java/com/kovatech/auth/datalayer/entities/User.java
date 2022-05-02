@@ -34,6 +34,8 @@ public class User extends BaseEntity implements Persistable<Integer> {
     private int active;
     private String expiryTime;
     private String activationCode;
+    private String forgottenPasswordCode;
+    private String forgottenPasswordTime;
 
     @Transient
     private boolean newUser;
