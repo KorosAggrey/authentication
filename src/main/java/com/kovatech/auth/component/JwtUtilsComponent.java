@@ -4,6 +4,7 @@ import com.kovatech.auth.config.MsConfigProperties;
 import com.kovatech.auth.core.enums.WsProcessLogger;
 import com.kovatech.auth.core.logging.WsLogManager;
 import com.kovatech.auth.datalayer.entities.User;
+import com.kovatech.auth.enums.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
@@ -49,7 +50,9 @@ public class JwtUtilsComponent {
 
     public String generateToken(User user) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", "User");
+        claims.put("role", Role.ROLE_USER);
+        claims.put("id",user.getPublicId());
+        claims.put("email", user.getEmail());
         return doGenerateToken(claims, user);
     }
 
